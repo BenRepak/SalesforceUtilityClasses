@@ -42,7 +42,7 @@ public with sharing class HouseAccountUtility {
 
 
      /*******************************************************************************************************
-     * @description finds or createas a house account by name
+     * @description finds or creates a house account by name
      * 
      * @param accountName name of account to be queried or created
      * 
@@ -56,7 +56,7 @@ public with sharing class HouseAccountUtility {
             System.debug('<<<<<<<< EXCEPTION: AccountUtility.getSingleAccountByName >>>>>>>>');
             System.debug('Exception type caught: ' + qe.getTypeName());    
             System.debug('Message: ' + qe.getMessage());    
-            System.debug('Cause: ' + qe.getCause());    // returns null
+            System.debug('Cause: ' + qe.getCause());    
             System.debug('Line number: ' + qe.getLineNumber());    
             System.debug('Stack trace: ' + qe.getStackTraceString());
             a = createSingleHouseAccountByName(accountName);
