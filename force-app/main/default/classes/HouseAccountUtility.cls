@@ -17,6 +17,11 @@ public with sharing class HouseAccountUtility {
     public static String houseAccountNamePrefix = 'Unknown Employer';
 
     /*******************************************************************************************************
+    * @description
+    */
+    private static Account houseAccount;
+
+    /*******************************************************************************************************
     * @description recordTypeId for house accounts, used if creating new account
     */
     private final static Id HOUSE_ACCT_REC_TYPE = Schema.SObjectType.Account.getRecordTypeInfosByName().get('Eccles House Account').getRecordTypeId();
@@ -35,9 +40,12 @@ public with sharing class HouseAccountUtility {
      * @return Account
      */
     public static Account getOrCreateSingleHouseAccount() {
-        String accountName = buildHouseAccountNameByDate(houseAccountNameDate);
-        Account a = getOrCreateSingleHouseAccountByName(accountName);
-        return a;
+        String accountName;
+        if(houseAccount == null) {
+            accountName = buildHouseAccountNameByDate(houseAccountNameDate);
+            houseAccount = getOrCreateSingleHouseAccountByName(accountName);   
+        } 
+        return houseAccount;
     }
 
 

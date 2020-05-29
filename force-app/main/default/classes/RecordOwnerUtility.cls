@@ -5,7 +5,7 @@ public with sharing class RecordOwnerUtility {
 
 
     // group
-    public static User getSingleUserByPublicGroup(String groupName) {
+    public static User getSingleUserByPublicGroupName(String groupName) {
         List<User> users  = [SELECT Id, Name FROM User WHERE isActive = TRUE AND ID IN (SELECT UserOrGroupId FROM GroupMember WHERE Group.Name = :groupName)];
         return selectRandomUser(users);
     }
