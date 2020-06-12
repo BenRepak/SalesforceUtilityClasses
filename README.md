@@ -20,7 +20,7 @@ system.debug(HouseAccountUtility.getOrCreateSingleHouseAccountByName('Graduate P
 
 ### TODO
 
--write test class
+- write test class
 
 ### Sample Implementation
 
@@ -87,8 +87,8 @@ system.debug(RecordOwnerUtility.getCurrentUser());
 
 ### TODO
 
--write test class
--update comments in class
+- write test class
+- update comments in class
 
 ### Sample Implementation
 
@@ -102,7 +102,7 @@ public with sharing class MyClass {
   Id ownerId;
 
   public myClass(){
-    // assign account variable in current class by calling HouseAccountUtility utility class
+    // assign user variable in current class by calling RecordOwnerUtility utility class
     User u = RecordOwnerUtility.getSingleUserByRoleName('MBA Admin');
     ownerId = u.Id;
   }
