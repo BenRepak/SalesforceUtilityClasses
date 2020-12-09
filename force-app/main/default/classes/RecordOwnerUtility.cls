@@ -1,142 +1,148 @@
 public with sharing class RecordOwnerUtility {
     public static Boolean useCachedUserMap = true;
 
-    private static User cachedOwnerUser;
+    //private static User cachedOwnerUser;
     private static String cachedFromWhereNameOrId;
     private static String cachedFromWhereType;
-    private static Map<String, User> cachedUserMap = new Map<String, User>();
     private static integer querycounter = 0;
-
-
     private static Map<String, List<User>> cachedUserMapList = new Map<String, List<User>>();
 
-
-
-    // TODO - implement a method to get next item in cached user map
-
+    // TODO 
+    // - implement a method to query multiple groups / profiles / roles and cache them
+    // - implement a method to get next item in cached user map
 
     public static void resetCachedVariables() {
-        cachedOwnerUser = null;
+        cachedFromWhereType = null;
         cachedFromWhereNameOrId = null;
+    }
+
+    // to be used to cache many users for multiple profiles / roles / groups in a single soql 
+    // this is a work in progres....
+    private static void cacheUserList(String fromWhereType, List<String> fromWhereNamesorIds){
+        String queryString;
+        List<User> users;
+        // build query string
+        queryString = buildMultiTypeQueryString(fromWhereType,fromWhereNamesorIds);
+        // perform query
+        users = Database.query(queryString);
+        // role 
+     
+    
+        querycounter++;
+        String mapKey = getMapKey();
+       // updatedCachedUserListMap(mapKey, users);
+        system.debug(cachedUserMapList.size());
+
+
+        // update map 
     }
 
     public static User getRandomUser(String fromWhereType, String fromWhereNameOrId){
         User u;
         String queryString;
-        // reset cached variables if values don't match
-        // this means a new variable has been passed in
-        if((cachedFromWhereType != fromWhereType) || (cachedFromWhereNameOrId != fromWhereNameOrId)) {
-            resetCachedVariables();
-            cachedFromWhereNameOrId = fromWhereNameOrId;
-            cachedFromWhereType = fromWhereType;
-        }    
+        cachedFromWhereNameOrId = fromWhereNameOrId;
+        cachedFromWhereType = fromWhereType;
+         
+        // build query string
+        queryString = buildSingleTypeQueryString(cachedFromWhereType);
 
-        // check if user is cached from a previous query within execution context
-        //u = searchCachedUserMap();
-        u = searchCachedUserListMap();
-
-        // if no cached user is found, build dynamic query string
-        if(u == null){
-            system.debug('enter query string');
-            // build query string
-            queryString = buildQueryString(cachedFromWhereType);
-        }
-
-        
         // execute query if a query string was built
-        if(queryString != null){
-            u = getSingleUserbyDynamicQuery(queryString);
-        }
+        u = getSingleUserbyDynamicQuery(queryString);
 
         // if after checking cache and executing query there still isn't a user, fall back to currentUser 
         if(u == null){
-            system.debug('enter null');
             u = getCurrentUser();
         }
         system.debug('queryCounter --> ' + querycounter);
-        
-        // add current cached config to map if userCachedUserMap is enabled
-        //updatedCachedUserListMap();
-        updateCachedUserMap();
         return u;
     }
 
-    private static string buildQueryString(String fromWhereType){
+    private static string buildSingleTypeQueryString(String fromWhereType){
         String queryString;
         switch on fromWhereType.toLowerCase(){
             when 'group' {
-                queryString = 'SELECT Id, Name FROM User WHERE isActive = TRUE AND ID IN (SELECT UserOrGroupId FROM GroupMember WHERE Group.DeveloperName = :cachedFromWhereNameOrId OR GroupId = :cachedFromWhereNameOrId)';
-                //u = getSingleUserByPublicGroupName(cachedFromWhereNameOrId);
+                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ID IN (SELECT UserOrGroupId FROM GroupMember WHERE Group.DeveloperName = :cachedFromWhereNameOrId OR GroupId = :cachedFromWhereNameOrId)';
             }
             when 'user'{
-                queryString = 'SELECT Id, Name FROM User WHERE isActive = TRUE AND (Name =:cachedFromWhereNameOrId OR Id =:cachedFromWhereNameOrId) LIMIT 1';
-
-                // u = getSingleUserByFullName(cachedFromWhereNameOrId);
+                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND (Name =:cachedFromWhereNameOrId OR Id =:cachedFromWhereNameOrId) LIMIT 1';
             }
             when 'profile'{
-                queryString = 'SELECT Id, Name FROM User WHERE isActive = TRUE AND ProfileId  IN (SELECT Id FROM Profile WHERE name = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId)';
-
-                // u = getSingleUserByProfileName(cachedFromWhereNameOrId);
+                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ProfileId  IN (SELECT Id FROM Profile WHERE name = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId)';
             }
             when 'role'{
-                queryString  = 'SELECT Id, Name FROM User WHERE isActive = TRUE AND UserRoleId IN (SELECT Id FROM UserRole WHERE DeveloperName = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId)';
-                //u = getSingleUserByRoleName(cachedFromWhereNameOrId);
+                queryString  = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND UserRoleId IN (SELECT Id FROM UserRole WHERE DeveloperName = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId)';
             }
         }
-        system.debug('queryString --> ' + queryString);
+        // system.debug('queryString --> ' + queryString);
         return queryString;
     }
 
 
+    private static string buildMultiTypeQueryString(String fromWhereType, List<String> cachedFromWhereNameOrId){
+        String queryString;
+        switch on fromWhereType.toLowerCase(){
+            when 'group' {
+                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ID IN (SELECT UserOrGroupId FROM GroupMember WHERE Group.DeveloperName IN :cachedFromWhereNameOrId OR GroupId IN :cachedFromWhereNameOrId)';
+            }
+            when 'user'{
+                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND (Name IN :cachedFromWhereNameOrId OR Id IN :cachedFromWhereNameOrId) LIMIT 1';
+            }
+            when 'profile'{
+                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ProfileId  IN (SELECT Id FROM Profile WHERE name IN :cachedFromWhereNameOrId or Id IN :cachedFromWhereNameOrId)';
+            }
+            when 'role'{
+                queryString  = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND UserRoleId IN (SELECT Id FROM UserRole WHERE DeveloperName IN :fromWhereNameOrId or Id IN :cachedFromWhereNameOrId)';
+            }
+        }
+        // system.debug('queryString --> ' + queryString);
+        return queryString;
+    }
 
 
      // dynamic user query
      private static User getSingleUserbyDynamicQuery(String dynamicQuery) {
         List<User> users  = new List<User>();
-        if(cachedOwnerUser == null || cachedFromWhereNameOrId == null) {
+        User u = searchCachedUserListMap();
+        if(u == null && dynamicQuery != null) {
             users = Database.query(dynamicQuery);
             querycounter++;
-            cachedOwnerUser = selectRandomUser(users);
-            updatedCachedUserListMap(users);
+            String mapKey = getMapKey();
+            updatedCachedUserListMap(mapKey, users);
+            u = selectRandomUser(users);
         }    
-        return cachedOwnerUser;
+        return u;
     }
-
-    private static User searchCachedUserMap(){
-        if(cachedUserMap.get(cachedFromWhereType+cachedFromWhereNameOrId) != null){
-            cachedOwnerUser = cachedUserMap.get(cachedFromWhereType+cachedFromWhereNameOrId);
-        }
-        return cachedOwnerUser;
-    }
-    
-    private static void updateCachedUserMap(){
-        if(useCachedUserMap == true){
-            cachedUserMap.put(cachedFromWhereType+cachedFromWhereNameOrId,cachedOwnerUser);
-        }
-    }
-
+ 
 
     private static User searchCachedUserListMap(){
-        if(cachedUserMapList.get(cachedFromWhereType+cachedFromWhereNameOrId) != null){
-            List<User> users = cachedUserMapList.get(cachedFromWhereType+cachedFromWhereNameOrId);
-            cachedOwnerUser = selectRandomUser(Users);
+        User u;
+        String mapKey = getMapKey();
+        if(cachedUserMapList.get(mapKey) != null){
+            List<User> users = cachedUserMapList.get(mapKey);
+            u = selectRandomUser(Users);
         }
-        return cachedOwnerUser;
+        return u;
     }
 
 
-    private static void updatedCachedUserListMap(List<User> userResults){
-        if(useCachedUserMap == true){
-            for(User u : userResults){
-                if(cachedUserMapList.containsKey(cachedFromWhereType+cachedFromWhereNameOrId)) {
-                    List<User> users = cachedUserMapList.get(cachedFromWhereType+cachedFromWhereNameOrId);
-                    users.add(u);
-                //    userRoleToUsers.put(newUser.UserRoleId, usersId);
-                } else {
-                    cachedUserMapList.put(cachedFromWhereType+cachedFromWhereNameOrId, new List<User> {cachedOwnerUser});
-                }
+    private static void updatedCachedUserListMap(String mapKey, List<User> userResults){
+        // skip building map if cache option disabled
+        if(useCachedUserMap != true){
+            return;
+        }
+        for(User u : userResults){
+            if(cachedUserMapList.containsKey(mapKey)) {
+                List<User> users = cachedUserMapList.get(mapKey);
+                users.add(u);
+            //    userRoleToUsers.put(newUser.UserRoleId, usersId);
+            } else {
+                cachedUserMapList.put(mapKey, new List<User> {u});
             }
         }
+    }
+
+    private static string getMapKey(){
+        return cachedFromWhereType+cachedFromWhereNameOrId;
     }
 
     private static User getCurrentUser() {
@@ -145,8 +151,8 @@ public with sharing class RecordOwnerUtility {
         u.username = UserInfo.getUserName(); 
         u.firstName = UserInfo.getFirstName();
         u.lastName = UserInfo.getLastName();
-        cachedOwnerUser = u;
-       return cachedOwnerUser;
+       // cachedOwnerUser = u;
+       return u;
     }
 
      private static User selectRandomUser(List<User> users) {
@@ -154,21 +160,17 @@ public with sharing class RecordOwnerUtility {
         if(listSize == 1){
             return users[0];
         }else if(listSize > 1) {
-            Integer randomIndex = getRandoIndexWithLimit(listSize);
+           Integer randomIndex = getRandomInteger(listSize);
             return users[randomIndex];
         } else {
             return getCurrentUser();
         }
      }
 
-     private static Integer getRandoIndexWithLimit(Integer upperLimit){
-        Integer randTemp = Math.round(Math.random()*1000);
-        Integer randFinal = Math.mod(randTemp, upperLimit);
-        if(randFinal > upperLimit) {
-            return upperLimit;
-        } else {
-            return randFinal;
-        }
+    private static integer getRandomInteger(Integer upperLimit){
+        Double randomNumber = Math.random() * upperLimit;
+        Integer randomIndex = randomNumber.intValue();
+        return randomIndex;
     }
 
     
