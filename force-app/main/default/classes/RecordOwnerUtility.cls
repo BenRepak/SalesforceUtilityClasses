@@ -10,6 +10,7 @@ public with sharing class RecordOwnerUtility {
     // TODO 
     // - implement a method to query multiple groups / profiles / roles and cache them
     // - implement a method to get next item in cached user map
+    // - implement an option to queue a first user or queue all users from query
 
     public static void resetCachedVariables() {
         cachedFromWhereType = null;
@@ -37,7 +38,28 @@ public with sharing class RecordOwnerUtility {
         // update map 
     }
 
-    public static User getRandomUser(String fromWhereType, String fromWhereNameOrId){
+
+  
+
+    public static User getRandomUserByGroupOrQueue(String fromWhereNameOrId){
+        return getRandomUser('group', fromWhereNameOrId);
+    }
+
+    public static User getRandomUserByProfile(String fromWhereNameOrId){
+        return getRandomUser('profile', fromWhereNameOrId);
+    }
+
+    public static User getRandomUserByRole(String fromWhereNameOrId){
+        return getRandomUser('role', fromWhereNameOrId);
+    }
+
+    public static User getUserByFullName(String fromWhereNameOrId){
+        return getRandomUser('user', fromWhereNameOrId);
+    }
+
+
+
+    private static User getRandomUser(String fromWhereType, String fromWhereNameOrId){
         User u;
         String queryString;
         cachedFromWhereNameOrId = fromWhereNameOrId;
@@ -171,6 +193,35 @@ public with sharing class RecordOwnerUtility {
         Double randomNumber = Math.random() * upperLimit;
         Integer randomIndex = randomNumber.intValue();
         return randomIndex;
+    }
+
+
+
+    public class RecordOwnerRequest{
+        @InvocableVariable (required=true)
+        public boolean userCacheEnabled;
+
+        @InvocableVariable (required=true)
+        public string fromWhereType;
+
+        @InvocableVariable (required=true)
+        public string fromWhereNameOrId;
+    }
+
+    public class RecordOwnerResponse{
+        @InvocableVariable
+        public User randomUser;
+    }
+
+    @InvocableMethod (label='Get Random User' description='Returns the list of random users from specified profiles, roles, or groups.')
+    public static List<RecordOwnerResponse> getRandomUser(List<RecordOwnerRequest> requests){
+        List<RecordOwnerResponse> responses = new List<RecordOwnerResponse>();
+        for(RecordOwnerRequest request : requests){
+            RecordOwnerResponse response = new RecordOwnerResponse();
+            response.randomUser = getRandomUser(request.fromWhereType, request.fromWhereNameOrId);
+            responses.add(response);
+        }
+        return responses;
     }
 
     
