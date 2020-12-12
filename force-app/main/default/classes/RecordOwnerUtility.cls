@@ -1,6 +1,12 @@
 public with sharing class RecordOwnerUtility {
     public static Boolean useCachedUserMap = true;
 
+    public static Integer defaultQueryRecordLimit = 200;
+
+    public static Boolean queryAllUserFields = false;
+    private static String cachedUserFields;
+
+
     //private static User cachedOwnerUser;
     private static String cachedFromWhereNameOrId;
     private static String cachedFromWhereType;
@@ -12,34 +18,12 @@ public with sharing class RecordOwnerUtility {
     // - implement a method to get next item in cached user map
     // - implement an option to queue a first user or queue all users from query
 
+
     public static void resetCachedVariables() {
         cachedFromWhereType = null;
         cachedFromWhereNameOrId = null;
     }
-
-    // to be used to cache many users for multiple profiles / roles / groups in a single soql 
-    // this is a work in progres....
-    private static void cacheUserList(String fromWhereType, List<String> fromWhereNamesorIds){
-        String queryString;
-        List<User> users;
-        // build query string
-        queryString = buildMultiTypeQueryString(fromWhereType,fromWhereNamesorIds);
-        // perform query
-        users = Database.query(queryString);
-        // role 
-     
-    
-        querycounter++;
-        String mapKey = getMapKey();
-       // updatedCachedUserListMap(mapKey, users);
-        system.debug(cachedUserMapList.size());
-
-
-        // update map 
-    }
-
-
-  
+ 
 
     public static User getRandomUserByGroupOrQueue(String fromWhereNameOrId){
         return getRandomUser('group', fromWhereNameOrId);
@@ -58,8 +42,28 @@ public with sharing class RecordOwnerUtility {
     }
 
 
+    @InvocableMethod (label='Get Random User' description='Returns the list of random users from specified profiles, roles, or groups.')
+    public static List<RecordOwnerResponse> getRandomUser(List<RecordOwnerRequest> requests){
+        List<RecordOwnerResponse> responses = new List<RecordOwnerResponse>();
+        for(RecordOwnerRequest request : requests){
+            if(request.defaultQueryRecordLimit != null){
+                defaultQueryRecordLimit = request.defaultQueryRecordLimit;
+            }
+            if(request.userCacheEnabled != null){
+                useCachedUserMap = request.userCacheEnabled;
+            }
+            queryAllUserFields = request.queryAllUserFields;
+
+            RecordOwnerResponse response = new RecordOwnerResponse();
+            response.randomUser = getRandomUser(request.fromWhereType, request.fromWhereNameOrId);
+            responses.add(response);
+        }
+        return responses;
+    }
+
 
     private static User getRandomUser(String fromWhereType, String fromWhereNameOrId){
+        validateQueryLimit();
         User u;
         String queryString;
         cachedFromWhereNameOrId = fromWhereNameOrId;
@@ -80,52 +84,51 @@ public with sharing class RecordOwnerUtility {
     }
 
     private static string buildSingleTypeQueryString(String fromWhereType){
+        String selectString = 'Id, FirstName, LastName, Name, UserName';
+        String whereString;
         String queryString;
+       
+        if(queryAllUserFields == true && cachedUserFields == null){
+            cachedUserFields = getUserFields();
+        } 
+        if(queryAllUserFields == true && cachedUserFields != null) {
+            selectString = cachedUserFields;
+        }
+
         switch on fromWhereType.toLowerCase(){
             when 'group' {
-                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ID IN (SELECT UserOrGroupId FROM GroupMember WHERE Group.DeveloperName = :cachedFromWhereNameOrId OR GroupId = :cachedFromWhereNameOrId)';
+                whereString = '(SELECT UserOrGroupId FROM GroupMember WHERE Group.DeveloperName = :cachedFromWhereNameOrId OR GroupId = :cachedFromWhereNameOrId) LIMIT ' + defaultQueryRecordLimit;
             }
             when 'user'{
-                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND (Name =:cachedFromWhereNameOrId OR Id =:cachedFromWhereNameOrId) LIMIT 1';
+                whereString = '(Name =:cachedFromWhereNameOrId OR Id =:cachedFromWhereNameOrId) LIMIT 1';
             }
             when 'profile'{
-                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ProfileId  IN (SELECT Id FROM Profile WHERE name = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId)';
+                whereString = 'ProfileId  IN (SELECT Id FROM Profile WHERE name = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId) LIMIT ' + defaultQueryRecordLimit;
             }
             when 'role'{
-                queryString  = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND UserRoleId IN (SELECT Id FROM UserRole WHERE DeveloperName = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId)';
+                whereString  = 'UserRoleId IN (SELECT Id FROM UserRole WHERE DeveloperName = :cachedFromWhereNameOrId or Id =:cachedFromWhereNameOrId) LIMIT ' + defaultQueryRecordLimit;
             }
         }
         // system.debug('queryString --> ' + queryString);
+        if(whereString != null){
+            queryString = 'SELECT ' + selectString + ' FROM User WHERE isActive = TRUE AND ' + whereString;
+        }
+        system.debug('select string --> ' + selectString);
         return queryString;
     }
 
 
-    private static string buildMultiTypeQueryString(String fromWhereType, List<String> cachedFromWhereNameOrId){
-        String queryString;
-        switch on fromWhereType.toLowerCase(){
-            when 'group' {
-                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ID IN (SELECT UserOrGroupId FROM GroupMember WHERE Group.DeveloperName IN :cachedFromWhereNameOrId OR GroupId IN :cachedFromWhereNameOrId)';
-            }
-            when 'user'{
-                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND (Name IN :cachedFromWhereNameOrId OR Id IN :cachedFromWhereNameOrId) LIMIT 1';
-            }
-            when 'profile'{
-                queryString = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND ProfileId  IN (SELECT Id FROM Profile WHERE name IN :cachedFromWhereNameOrId or Id IN :cachedFromWhereNameOrId)';
-            }
-            when 'role'{
-                queryString  = 'SELECT Id, FirstName, LastName, Name, UserName FROM User WHERE isActive = TRUE AND UserRoleId IN (SELECT Id FROM UserRole WHERE DeveloperName IN :fromWhereNameOrId or Id IN :cachedFromWhereNameOrId)';
-            }
+    private static void validateQueryLimit(){
+        if(defaultQueryRecordLimit < 1 || defaultQueryRecordLimit >= 50000){
+            defaultQueryRecordLimit = 200;
         }
-        // system.debug('queryString --> ' + queryString);
-        return queryString;
     }
-
 
      // dynamic user query
      private static User getSingleUserbyDynamicQuery(String dynamicQuery) {
         List<User> users  = new List<User>();
         User u = searchCachedUserListMap();
-        if(u == null && dynamicQuery != null) {
+        if(u == null && dynamicQuery != null && Limits.getQueries() < 100) {
             users = Database.query(dynamicQuery);
             querycounter++;
             String mapKey = getMapKey();
@@ -173,7 +176,10 @@ public with sharing class RecordOwnerUtility {
         u.username = UserInfo.getUserName(); 
         u.firstName = UserInfo.getFirstName();
         u.lastName = UserInfo.getLastName();
-       // cachedOwnerUser = u;
+       // add current user to the cached map to avoid looped query if no users are found
+       String mapKey = getMapKey();
+       updatedCachedUserListMap(mapKey, new User[]{u});
+
        return u;
     }
 
@@ -198,14 +204,21 @@ public with sharing class RecordOwnerUtility {
 
 
     public class RecordOwnerRequest{
-        @InvocableVariable (required=true)
+        @InvocableVariable (label='Enable User Query Caching' required=true)
         public boolean userCacheEnabled;
 
-        @InvocableVariable (required=true)
+        @InvocableVariable (label='User Query Type(Profile, Group, Role, or User)' required=true)
         public string fromWhereType;
 
-        @InvocableVariable (required=true)
+        @InvocableVariable (label='Name of component to query (e.g. My Custom User Profile' required=true)
         public string fromWhereNameOrId;
+
+        @InvocableVariable (label='Query Limit # Override' required=false)
+        public integer defaultQueryRecordLimit;
+
+        @InvocableVariable (label='Query All User Fields' required=false)
+        public boolean queryAllUserFields = false;
+
     }
 
     public class RecordOwnerResponse{
@@ -213,16 +226,20 @@ public with sharing class RecordOwnerUtility {
         public User randomUser;
     }
 
-    @InvocableMethod (label='Get Random User' description='Returns the list of random users from specified profiles, roles, or groups.')
-    public static List<RecordOwnerResponse> getRandomUser(List<RecordOwnerRequest> requests){
-        List<RecordOwnerResponse> responses = new List<RecordOwnerResponse>();
-        for(RecordOwnerRequest request : requests){
-            RecordOwnerResponse response = new RecordOwnerResponse();
-            response.randomUser = getRandomUser(request.fromWhereType, request.fromWhereNameOrId);
-            responses.add(response);
+
+    private static string getUserFields(){
+        List<String> userFieldsList = new List<String>();
+        for(Schema.SObjectField fld : Schema.SObjectType.User.fields.getMap().values()) {
+            // skip field if user cannot access
+            if(!fld.getDescribe().isAccessible()){
+                continue;
+            }
+            string fieldString = fld.getDescribe().getName();
+            userFieldsList.add(fieldString);
         }
-        return responses;
+        String selectStringfields = String.join(userFieldsList, ', ');
+        return selectStringfields;
     }
 
-    
+
 }
