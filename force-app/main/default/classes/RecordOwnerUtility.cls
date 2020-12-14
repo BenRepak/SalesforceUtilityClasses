@@ -1,5 +1,5 @@
 public with sharing class RecordOwnerUtility {
-    public static Boolean useCachedUserMap = true;
+    public static Boolean cacheAllUserRecords = true;
 
     public static Integer defaultQueryRecordLimit = 200;
 
@@ -49,8 +49,8 @@ public with sharing class RecordOwnerUtility {
             if(request.defaultQueryRecordLimit != null){
                 defaultQueryRecordLimit = request.defaultQueryRecordLimit;
             }
-            if(request.userCacheEnabled != null){
-                useCachedUserMap = request.userCacheEnabled;
+            if(request.cacheAllUserRecords != null){
+                cacheAllUserRecords = request.cacheAllUserRecords;
             }
             queryAllUserFields = request.queryAllUserFields;
 
@@ -133,7 +133,7 @@ public with sharing class RecordOwnerUtility {
             querycounter++;
             String mapKey = getMapKey();
             updatedCachedUserListMap(mapKey, users);
-            u = selectRandomUser(users);
+            u = searchCachedUserListMap();
         }    
         return u;
     }
@@ -151,18 +151,27 @@ public with sharing class RecordOwnerUtility {
 
 
     private static void updatedCachedUserListMap(String mapKey, List<User> userResults){
-        // skip building map if cache option disabled
-        if(useCachedUserMap != true){
-            return;
+        if(cacheAllUserRecords == false){
+            User randomUser = selectRandomUser(userResults);
+            userResults.clear();
+            userResults.add(randomUser);
         }
+
+    
         for(User u : userResults){
+           // if cacheing all users is disabled
+            // if(cachedUserMapList.containsKey(mapKey) && cacheAllUserRecords == false) {
+            //     return;
+            // }
             if(cachedUserMapList.containsKey(mapKey)) {
                 List<User> users = cachedUserMapList.get(mapKey);
                 users.add(u);
             //    userRoleToUsers.put(newUser.UserRoleId, usersId);
             } else {
                 cachedUserMapList.put(mapKey, new List<User> {u});
+                // if cacheing disabled, return after adding first item 
             }
+            
         }
     }
 
@@ -204,8 +213,8 @@ public with sharing class RecordOwnerUtility {
 
 
     public class RecordOwnerRequest{
-        @InvocableVariable (label='Enable User Query Caching' required=true)
-        public boolean userCacheEnabled;
+        @InvocableVariable (label='Enable Multi User Query Cache' required=true)
+        public boolean cacheAllUserRecords;
 
         @InvocableVariable (label='User Query Type(Profile, Group, Role, or User)' required=true)
         public string fromWhereType;
